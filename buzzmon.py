@@ -22,25 +22,35 @@ def strip_tags(value):
     """Returns the given HTML with all tags stripped."""
     return re.sub(r'<[^>]*?>', '', value.encode('utf-8', 'ignore'))
 
-def get_data():
+def get_all():
+	conn = sqlite3.connect('example.db')
+	c = conn.cursor()	
+	sources = c.execute('SELECT id, url from source')
+	for s in sources:
+		get_data(feed_url = s[1], id=s[0])
+		
+	
+def get_data(feed_url, id):
 	#TODO:
 	#	- Get new articles since last update
 	#   - store website name in database
-	feed_url = 'http://econsultancy.com/uk/blog.atom'
+	#feed_url = 'http://econsultancy.com/uk/blog.atom'
 	feed = feedparser.parse(feed_url)
 	conn = sqlite3.connect('example.db')
 	c = conn.cursor()
-	last_id = 3
-
+	
+	
+	
+	#date c.execute("SELCT title, date FROM data order by date")
+	
+	#print "dont get dupes:", feed_url, "-", id
+	#exit()
 	to_insert=[]
 	for entry in feed.entries:
 		yourdate = dateutil.parser.parse(entry.updated.encode('ascii', 'ignore'))
-		entry_date = str(yourdate.year)+"-"+str(yourdate.month)+"-"+str(yourdate.day)
+		entry_date = str(yourdate.year)+"-"+str(yourdate.month)+"-"+str(yourdate.day) + " " + str(yourdate.hour) + ":" + str(yourdate.minute) 
 		post_content = strip_tags(entry.content[0].value.encode('ascii', 'ignore'))
-		insert_statement = "INSERT INTO data (title, date, body) VALUES ( %s, %s, %s)" % ("title", entry_date, post_content) 
-		print "Going to insert:",insert_statement 
-		c.execute("INSERT INTO data (title, date, body) VALUES ( ?, ?, ?)", (entry['title'], entry_date, post_content))
-		
+		c.execute("INSERT INTO data (id, title, date, body, source_id) VALUES (?, ?, ?, ?, ?)", (None, entry['title'], entry_date, post_content, id))
 		#to_insert.append(( entry.title.encode('ascii', 'ignore'), entry_date, entry.content[0].value.encode('ascii', 'ignore')))	
 		
 	print to_insert
@@ -73,8 +83,8 @@ def get_word_count():
 		
 	return wc
 	
-print "here"	
-get_word_count()	
+print "here"
+get_all()	
 	
 """12:35
 Count the number of words 
