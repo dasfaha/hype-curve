@@ -35,24 +35,27 @@ def get_data(feed_url, id):
 	#	- Get new articles since last update
 	#   - store website name in database
 	#feed_url = 'http://econsultancy.com/uk/blog.atom'
+	
 	feed = feedparser.parse(feed_url)
 	conn = sqlite3.connect('example.db')
 	c = conn.cursor()
 	
+	db_titles = list(c.execute("SELECT title FROM data WHERE source_id=" + str(id))) 
+	existing_titles = [t[0].encode('ascii', 'ignore') for t in db_titles]
 	
-	
-	#date c.execute("SELCT title, date FROM data order by date")
-	
-	#print "dont get dupes:", feed_url, "-", id
-	#exit()
+	for x in existing_titles:
+		print x
+		
 	to_insert=[]
 	for entry in feed.entries:
-		yourdate = dateutil.parser.parse(entry.updated.encode('ascii', 'ignore'))
-		entry_date = str(yourdate.year)+"-"+str(yourdate.month)+"-"+str(yourdate.day) + " " + str(yourdate.hour) + ":" + str(yourdate.minute) 
-		post_content = strip_tags(entry.content[0].value.encode('ascii', 'ignore'))
-		c.execute("INSERT INTO data (id, title, date, body, source_id) VALUES (?, ?, ?, ?, ?)", (None, entry['title'], entry_date, post_content, id))
-		#to_insert.append(( entry.title.encode('ascii', 'ignore'), entry_date, entry.content[0].value.encode('ascii', 'ignore')))	
-		
+		#print entry, "-", feed	
+		if entry['title'].encode('ascii', 'ignore') not in existing_titles:
+			yourdate = dateutil.parser.parse(entry.updated.encode('ascii', 'ignore'))
+			entry_date = str(yourdate.year)+"-"+str(yourdate.month)+"-"+str(yourdate.day) + " " + str(yourdate.hour) + ":" + str(yourdate.minute) 
+			post_content = strip_tags(entry.content[0].value.encode('ascii', 'ignore'))
+			c.execute("INSERT INTO data (id, title, date, body, source_id) VALUES (?, ?, ?, ?, ?)", (None, entry['title'], entry_date, post_content, id))
+			#to_insert.append(( entry.title.encode('ascii', 'ignore'), entry_date, entry.content[0].value.encode('ascii', 'ignore')))	
+			
 	print to_insert
 	#cur.executemany("INSERT INTO buzzmon.data (title, date, body) VALUES ( %s, %s, %s)", to_insert) 
 		
