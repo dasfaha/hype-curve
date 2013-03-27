@@ -1,10 +1,15 @@
 from collections import Counter
 import dateutil.parser
+import datetime
 import feedparser
+import nltk
 from itertools import tee, islice
 import json
 import re
 import sqlite3
+
+#Pick a word and and plot it over time
+#Remove marketing "stop words"
 
 def ngrams(lst, n):
   tlst = lst
@@ -62,12 +67,17 @@ def get_data(feed_url, id):
 	conn.commit()
 	conn.close()
 
-def get_word_count():
+def get_word_count(start_date, end_date):
 	""" Get word count"""
 	
 	conn = sqlite3.connect('example.db')
 	c = conn.cursor()
-	c.execute("SELECT body FROM DATA")
+	
+	if start_date and end_date:
+		c.execute("SELECT body FROM DATA WHERE date >= ? and date <= ?", (start_date, end_date))
+	else:
+		c.execute("SELECT body FROM DATA")
+		
 	all_text = ""
 	for row in c:
 		all_text += row[0].encode('ascii', 'ignore')
@@ -80,15 +90,74 @@ def get_word_count():
 	all_words = []
 	all_words = all_text.split()
 	
-	wc = Counter(all_words)
-	for x in wc.keys()[0:10]:
-		print x, " - ", wc[x]
+	no_stop_words = [ word for word in all_words if word not in nltk.corpus.stopwords.words('english') ]
+	
+	
+	wc = Counter(no_stop_words)
 		
 	return wc
+
+def trend_word(word, start_date, freq='days', period=7):
+	s_dte = datetime.datetime(*start_date)
 	
-print "here"
-get_all()	
+	if freq == 'days':
+		delta = datetime.timedelta( days = int(period) )
+	else:
+		raise Exception("Implement me")
 	
+	e_dte = s_dte + delta
+	
+	word_trend = {}
+	
+	while 1:
+		print s_dte, " ---- ", e_dte
+		s_dte_prep = str(s_dte).replace('-0', '-')
+		e_dte_prep = str(e_dte).replace('-0', '-')
+		wrd_count = get_word_count(s_dte_prep, e_dte_prep)
+		word_trend[s_dte] = wrd_count.get(word, "")
+		s_dte = e_dte
+		e_dte += delta
+		
+		#Breaking on this condition so that we don't include incomplete time periods 
+		if e_dte > datetime.datetime.now():
+			break
+		
+	return word_trend
+
+	
+def clean_up_dates():
+	conn = sqlite3.connect('example.db')
+	c = conn.cursor()
+	
+	c.execute("SELECT date FROM DATA")
+	
+	rgx_middle = re.compile('.*-([0-9]{1,1})-.*')
+	rgx_end = re.compile('.*-([0-9]{1,1})\s{1,1}.*')
+	
+	for d in c:
+		orig_date = d[0]
+		new_date = orig_date
+		
+		m_middle = re.match(rgx_middle, orig_date)
+		m_end = re.match(rgx_middle, orig_date)
+		
+		if m_middle:
+			new_date.replace('-' + m_middle.group(1) + '-', '-0' + m_middle.group(1) + ' ')
+		if m_end:
+			new_date.replace('-' + m_end.group(1) + ' ', '-0' + m_end.group(1) + ' ')
+	
+		print "Original data: {0} - New date {1})".format(orig_date, new_date)
+			
+clean_up_dates()
+#get_all()
+#mobile_trend = trend_word(word='mobile', start_date = (2013,2,1))	
+#print mobile_trend	
+#print "Running"
+#wc = get_word_count()	
+#print "Most commong words:"
+#print wc.most_common(10)
+
+
 """12:35
 Count the number of words 
 
