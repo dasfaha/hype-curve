@@ -1,3 +1,4 @@
+from __future__ import division
 from collections import Counter
 import dateutil.parser
 import datetime
@@ -67,7 +68,7 @@ def get_data(feed_url, id):
 	conn.commit()
 	conn.close()
 
-def get_word_count(start_date, end_date):
+def get_word_count(start_date, end_date, count=False):
 	""" Get word count"""
 	
 	conn = sqlite3.connect('example.db')
@@ -78,7 +79,6 @@ def get_word_count(start_date, end_date):
 		c.execute("SELECT body FROM DATA WHERE date >= ? and date <= ?", (start_date, end_date))
 	else:
 		c.execute("SELECT body FROM DATA")
-		
 	data = c.fetchall()
 	
 	all_text = ""
@@ -86,35 +86,43 @@ def get_word_count(start_date, end_date):
 		all_text += row[0].encode('ascii', 'ignore')
 	
 	if all_text: print "processed data"
-	
 	all_text = all_text.translate(None, '!?;":(),-.')
-	
 	all_text = all_text.lower()
-	
 	all_words = []
 	all_words = all_text.split()
-	
 	no_stop_words = [ word for word in all_words if word not in nltk.corpus.stopwords.words('english') ]
-	
-	
 	wc = Counter(no_stop_words)
+	
+	#caculate frequencies
+	if not count:
+		wdict = {}
+		total_word_count = 0
+		for k in wc.keys():
+			total_word_count += wc[k]
+			wdict[k] = wc[k]
+		
+		for k in wdict.keys():
+			wdict[k] = wdict[k]/total_word_count
+		
+		wc = wdict
+		
+		
 		
 	return wc
 
 def trend_word(word, start_date, freq='days', period=7):
-	s_dte = datetime.datetime(*start_date)
-	
+
+	s_dte = datetime.datetime(*start_date)	
 	if freq == 'days':
 		delta = datetime.timedelta( days = int(period) )
 	else:
 		raise Exception("Implement me")
-	
 	e_dte = s_dte + delta
 	
 	word_trend = {}
 	
 	while 1:
-		wrd_count = get_word_count(s_dte, e_dte)
+		wrd_count = get_word_count(s_dte, e_dte, count=False)
 		word_trend[s_dte] = wrd_count.get(word, "")
 		s_dte = e_dte
 		e_dte += delta
@@ -156,21 +164,16 @@ def clean_up_dates():
 		dates.append((new_date, orig_date))
 		
 	update_sql = "UPDATE data SET date=? WHERE date=?"
-	#uncomment lines below to change dates to have a leading zero for single digit months and days	
-	#conn = sqlite3.connect('example.db')
-	#c = conn.cursor()	
-	#c.executemany(update_sql, dates)
-	#conn.commit()	
-		#
+	
 			
 #clean_up_dates()
 
 
 
-#get_all()
-print "Running"
-mobile_trend = trend_word(word='mobile', start_date = (2013,2,1))	
-print mobile_trend	
+get_all()
+#print "Running"
+#mobile_trend = trend_word(word='mobile', start_date = (2013,2,1))	
+#print mobile_trend	
 
 #wc = get_word_count()	
 #print "Most commong words:"
