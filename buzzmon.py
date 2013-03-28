@@ -56,7 +56,7 @@ def get_data(feed_url, id):
 		#print entry, "-", feed	
 		if entry['title'].encode('ascii', 'ignore') not in existing_titles:
 			yourdate = dateutil.parser.parse(entry.updated.encode('ascii', 'ignore'))
-			entry_date = str(yourdate.year)+"-"+str(yourdate.month)+"-"+str(yourdate.day) + " " + str(yourdate.hour) + ":" + str(yourdate.minute) 
+			entry_date = str(yourdate.year)+"-"+str(yourdate.month).zfill(2) + "-"+ str(yourdate.day).zfill(2) + " " + str(yourdate.hour) + ":" + str(yourdate.minute) 
 			post_content = strip_tags(entry.content[0].value.encode('ascii', 'ignore'))
 			c.execute("INSERT INTO data (id, title, date, body, source_id) VALUES (?, ?, ?, ?, ?)", (None, entry['title'], entry_date, post_content, id))
 			#to_insert.append(( entry.title.encode('ascii', 'ignore'), entry_date, entry.content[0].value.encode('ascii', 'ignore')))	
@@ -74,15 +74,19 @@ def get_word_count(start_date, end_date):
 	c = conn.cursor()
 	
 	if start_date and end_date:
+		print "running with a restricted time period {0} -- {1} ".format(start_date, end_date)
 		c.execute("SELECT body FROM DATA WHERE date >= ? and date <= ?", (start_date, end_date))
 	else:
 		c.execute("SELECT body FROM DATA")
 		
+	data = c.fetchall()
+	
 	all_text = ""
-	for row in c:
+	for row in data:
 		all_text += row[0].encode('ascii', 'ignore')
-
-	print "here"
+	
+	if all_text: print "processed data"
+	
 	all_text = all_text.translate(None, '!?;":(),-.')
 	
 	all_text = all_text.lower()
@@ -110,10 +114,7 @@ def trend_word(word, start_date, freq='days', period=7):
 	word_trend = {}
 	
 	while 1:
-		print s_dte, " ---- ", e_dte
-		s_dte_prep = str(s_dte).replace('-0', '-')
-		e_dte_prep = str(e_dte).replace('-0', '-')
-		wrd_count = get_word_count(s_dte_prep, e_dte_prep)
+		wrd_count = get_word_count(s_dte, e_dte)
 		word_trend[s_dte] = wrd_count.get(word, "")
 		s_dte = e_dte
 		e_dte += delta
@@ -124,6 +125,7 @@ def trend_word(word, start_date, freq='days', period=7):
 		
 	return word_trend
 
+
 	
 def clean_up_dates():
 	conn = sqlite3.connect('example.db')
@@ -132,27 +134,44 @@ def clean_up_dates():
 	c.execute("SELECT date FROM DATA")
 	
 	rgx_middle = re.compile('.*-([0-9]{1,1})-.*')
-	rgx_end = re.compile('.*-([0-9]{1,1})\s{1,1}.*')
+	rgx_end = re.compile('.*-([0-9]{1,1})\s+.*')
+	
+	dates = []
 	
 	for d in c:
 		orig_date = d[0]
 		new_date = orig_date
 		
 		m_middle = re.match(rgx_middle, orig_date)
-		m_end = re.match(rgx_middle, orig_date)
+		m_end = re.match(rgx_end, orig_date)
 		
 		if m_middle:
-			new_date.replace('-' + m_middle.group(1) + '-', '-0' + m_middle.group(1) + ' ')
+			new_date = new_date.replace('-' + m_middle.group(1) + '-', '-0' + m_middle.group(1) + '-')
 		if m_end:
-			new_date.replace('-' + m_end.group(1) + ' ', '-0' + m_end.group(1) + ' ')
-	
-		print "Original data: {0} - New date {1})".format(orig_date, new_date)
+			print "there", m_end.group(1)
+			new_date = new_date.replace('-' + m_end.group(1) + ' ', '-0' + m_end.group(1) + ' ')
+		
+		if orig_date != new_date:
+			print "Original data: {0} - New date {1}".format(orig_date, new_date)	
+		dates.append((new_date, orig_date))
+		
+	update_sql = "UPDATE data SET date=? WHERE date=?"
+	#uncomment lines below to change dates to have a leading zero for single digit months and days	
+	#conn = sqlite3.connect('example.db')
+	#c = conn.cursor()	
+	#c.executemany(update_sql, dates)
+	#conn.commit()	
+		#
 			
-clean_up_dates()
+#clean_up_dates()
+
+
+
 #get_all()
-#mobile_trend = trend_word(word='mobile', start_date = (2013,2,1))	
-#print mobile_trend	
-#print "Running"
+print "Running"
+mobile_trend = trend_word(word='mobile', start_date = (2013,2,1))	
+print mobile_trend	
+
 #wc = get_word_count()	
 #print "Most commong words:"
 #print wc.most_common(10)
